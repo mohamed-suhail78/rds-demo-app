@@ -45,6 +45,6 @@ jobs:
       - name: Force ECS Deployment
         run: |
           aws ecs update-service \
-          --cluster warmhearted-rabbit-ra4c2h \
-          --service uat-rds-demo-app-service-sluz1jkr \
+          --cluster outstanding-deer-3ja5iz \
+          --service sit-uat-service-v4dcgajt \
           --force-new-deployment
