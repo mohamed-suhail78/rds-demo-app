@@ -24,7 +24,7 @@ public class employeecontroller {
     	}
     	@GetMapping("/version")
     	public String version() {
-    	    return ("DEPLOYED CI/CD PIPELINE");
+    	    return ("after version 2 ci /cd deployed");
     	}
 
  
