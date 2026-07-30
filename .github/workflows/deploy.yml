@@ -1,17 +1,9 @@
-name: Deploy to ECS Fargate
+name: Deploy Docker App to EC2
 
 on:
   push:
     branches:
       - main
-
-env:
-  AWS_REGION: ap-south-1
-  ECR_REPOSITORY: new-repo
-  ECS_CLUSTER: outstanding-deer-3ja5iz
-  ECS_SERVICE: sit-uat-service-v4dcgajt
-  ECS_TASK_DEFINITION: sit-uat-2
-  CONTAINER_NAME: sit-uat-2
 
 jobs:
   deploy:
@@ -25,7 +17,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: 17
 
       - name: Build Spring Boot Application
         run: mvn clean package -DskipTests
@@ -35,41 +27,39 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, Tag and Push Docker Image
-        id: build-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Build Docker Image
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          docker build -t cd-repo .
+          docker tag cd-repo:latest 716525550340.dkr.ecr.ap-south-1.amazonaws.com/cd-repo:latest
 
-      - name: Download Current Task Definition
+      - name: Push Docker Image
         run: |
-          aws ecs describe-task-definition \
-            --task-definition $ECS_TASK_DEFINITION \
-            --query taskDefinition \
-            > task-definition.json
+          docker push 716525550340.dkr.ecr.ap-south-1.amazonaws.com/cd-repo:latest
 
-      - name: Update Task Definition
-        id: render-task
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          task-definition: task-definition.json
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.build-image.outputs.image }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 716525550340.dkr.ecr.ap-south-1.amazonaws.com
 
-      - name: Deploy New Task Definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render-task.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+            docker pull 716525550340.dkr.ecr.ap-south-1.amazonaws.com/cd-repo:latest
+
+            docker stop cd-app || true
+            docker rm cd-app || true
+
+            docker run -d \
+              --name cd-app \
+              -p 8080:8080 \
+              --restart unless-stopped \
+              716525550340.dkr.ecr.ap-south-1.amazonaws.com/cd-repo:latest
+
+            docker image prune -f
