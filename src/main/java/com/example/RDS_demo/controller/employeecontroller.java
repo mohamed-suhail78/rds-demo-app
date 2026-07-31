@@ -24,7 +24,7 @@ public class employeecontroller {
     	}
     	@GetMapping("/version")
     	public String version() {
-    	    return ("after 	EC2 ci/cd deployment");
+    	    return ("after 	v2 EC2 ci/cd deployment");
     	}
 
  
