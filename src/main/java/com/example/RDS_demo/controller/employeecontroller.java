@@ -24,6 +24,7 @@ public class employeecontroller {
     	}
     	@GetMapping("/version")
     	public String version() {
+
     	    return ("after 	EC2 ci/cd deployment done by    master vijay");
     	}
 
